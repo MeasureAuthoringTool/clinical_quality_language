@@ -5,10 +5,7 @@ import org.hl7.elm.r1.VersionedIdentifier;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * Manages a set of CQL libraries. As new library references are encountered
@@ -21,6 +18,12 @@ public class LibraryManager {
     private final Stack<String> translationStack;
     private final DefaultLibrarySourceLoader librarySourceLoader;
 
+    // For use in MAT code... capture elm output, translator mappings, and library mappings here.
+    private Map<String, CqlTranslator> translators;
+    private Map<String, TranslatedLibrary> libraryMap; // I know a mapping is already done up above, but this captures
+    // information on libraryname-x.x.xxx, which is consistent with
+    // with all of our implementations
+
     public LibraryManager(ModelManager modelManager) {
         if (modelManager == null) {
             throw new IllegalArgumentException("modelManager is null");
@@ -29,12 +32,16 @@ public class LibraryManager {
         libraries = new HashMap<>();
         translationStack = new Stack<>();
         this.librarySourceLoader = new DefaultLibrarySourceLoader();
+
+        // more MAT code...
+        this.translators = new HashMap<>();
+        this.libraryMap = new HashMap<>();
     }
-    
+
     public LibrarySourceLoader getLibrarySourceLoader() {
-      return librarySourceLoader;
+        return librarySourceLoader;
     }
-    
+
     public TranslatedLibrary resolveLibrary(VersionedIdentifier libraryIdentifier, List<CqlTranslatorException> errors) {
         if (libraryIdentifier == null) {
             throw new IllegalArgumentException("libraryIdentifier is null.");
@@ -45,9 +52,9 @@ public class LibraryManager {
         }
 
         TranslatedLibrary library = libraries.get(libraryIdentifier.getId());
-        
-        if (library != null 
-                && libraryIdentifier.getVersion() != null 
+
+        if (library != null
+                && libraryIdentifier.getVersion() != null
                 && !libraryIdentifier.getVersion().equals(library.getIdentifier().getVersion())) {
             throw new CqlTranslatorIncludeException(String.format("Could not resolve reference to library %s, version %s because version %s is already loaded.",
                     libraryIdentifier.getId(), libraryIdentifier.getVersion(), library.getIdentifier().getVersion()), libraryIdentifier.getId(), libraryIdentifier.getVersion());
@@ -86,6 +93,11 @@ public class LibraryManager {
                         libraryIdentifier.getId(), libraryIdentifier.getVersion());
             }
 
+            // for use in MAT code... We should be able to capture the translators here, creating a mapping with
+            // between LibraryName-x.x.xxx and translator.
+            this.translators.put(libraryIdentifier.getId() + "-" + libraryIdentifier.getVersion(), translator);
+            this.libraryMap.put(libraryIdentifier.getId() + "-" + libraryIdentifier.getVersion(), result);
+
             return result;
         } catch (IOException e) {
             throw new CqlTranslatorIncludeException(String.format("Errors occurred translating library %s, version %s.",
@@ -114,5 +126,22 @@ public class LibraryManager {
         if (!libraryName.equals(currentLibraryName)) {
             throw new IllegalArgumentException(String.format("Translation stack imbalance for library %s.", libraryName));
         }
+    }
+
+    // more mat code below....
+    /**
+     * Returns a mapping of the libraryname-x.x.xxx to the translated library
+     * @return the library mapping
+     */
+    public Map<String, TranslatedLibrary> getLibraries() {
+        return libraryMap;
+    }
+
+    /**
+     * Returns a mapping of the libraryname-x-x-xxx to the translated library
+     * @return the translator mapping
+     */
+    public Map<String, CqlTranslator> getTranslators() {
+        return translators;
     }
 }

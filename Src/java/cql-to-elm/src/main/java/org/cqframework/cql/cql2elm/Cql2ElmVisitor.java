@@ -5,6 +5,7 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.cqframework.cql.cql2elm.cqlModels.*;
 import org.cqframework.cql.cql2elm.model.invocation.*;
 import org.cqframework.cql.cql2elm.preprocessor.*;
 import org.cqframework.cql.elm.tracking.*;
@@ -44,6 +45,7 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
     private TokenStream tokenStream;
 
     private final LibraryBuilder libraryBuilder;
+
     private final SystemMethodResolver systemMethodResolver;
 
     private LibraryInfo libraryInfo = null;
@@ -68,6 +70,15 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
     private final List<Expression> expressions = new ArrayList<>();
     private boolean implicitPatientCreated = false;
 
+    // For use in MAT Code. List of all of the model objects...
+    private List<CQLValueSetModelObject> cqlValueSetModelObjects = new ArrayList<>();
+    private List<CQLParameterModelObject> cqlParameterModelObjects = new ArrayList<>();
+    private List<CQLCodeModelObject> cqlCodeModelObjects = new ArrayList<>();
+    private List<CQLCodeSystemModelObject> cqlCodeSystemModelObjects = new ArrayList<>();
+    private List<CQLExpressionModelObject> cqlExpressionModelObjects = new ArrayList<>();
+    private List<CQLFunctionModelObject> cqlFunctionModelObjects = new ArrayList<>();
+    private List<CQLIncludeModelObject> cqlIncludeModelObjects = new ArrayList<>();
+
     public Cql2ElmVisitor(LibraryBuilder libraryBuilder) {
         super();
 
@@ -78,7 +89,7 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
         this.libraryBuilder = libraryBuilder;
         this.systemMethodResolver = new SystemMethodResolver(this, libraryBuilder);
     }
-    
+
     public void enableAnnotations() {
         annotate = true;
     }
@@ -280,12 +291,12 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
             if (o instanceof Trackable && !(tree instanceof cqlParser.LibraryContext)) {
                 this.track((Trackable) o, tree);
-        }
-        if (o instanceof Expression) {
-            addExpression((Expression) o);
-        }
+            }
+            if (o instanceof Expression) {
+                addExpression((Expression) o);
+            }
 
-        return o;
+            return o;
         } finally {
             if (annotate) {
                 popChunk(tree, o);
@@ -395,6 +406,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
         libraryBuilder.addParameter(param);
 
+        // for use in MAT code. Holds all of the important information about the paramter
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLParameterModelObject cqlParameterModelObject = new CQLParameterModelObject(ctx.identifier().getText(), tokens, param);
+        this.cqlParameterModelObjects.add(cqlParameterModelObject);
+
         return param;
     }
 
@@ -484,6 +503,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
                 .withResultType(new ListType(libraryBuilder.resolveTypeName("System", "Code")));
 
         libraryBuilder.addCodeSystem(cs);
+
+        // for use in mat code.. holds all of the important information about a code
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLCodeSystemModelObject cqlCodeSystemModelObject = new CQLCodeSystemModelObject(ctx.identifier().getText(), tokens, cs);
+        this.cqlCodeSystemModelObjects.add(cqlCodeSystemModelObject);
         return cs;
     }
 
@@ -549,6 +576,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
         vs.setResultType(new ListType(libraryBuilder.resolveTypeName("System", "Code")));
         libraryBuilder.addValueSet(vs);
 
+        // use in MAT Code. Creates a Valueset Model Object which holds important information.
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLValueSetModelObject cqlValueSetModelObject = new CQLValueSetModelObject(ctx.identifier().getText(), tokens, vs);
+        this.cqlValueSetModelObjects.add(cqlValueSetModelObject);
+
         return vs;
     }
 
@@ -569,6 +604,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
         cd.setResultType(libraryBuilder.resolveTypeName("Code"));
         libraryBuilder.addCode(cd);
+
+        // for use in MAT code... holds all of the important information about a code.
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLCodeModelObject cqlCodeModelObject = new CQLCodeModelObject(ctx.identifier().getText(), tokens, cd);
+        this.cqlCodeModelObjects.add(cqlCodeModelObject);
 
         return cd;
     }
@@ -670,6 +713,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
                 libraryBuilder.popExpressionContext();
             }
         }
+
+        // for use in MAT code... holds all of the important information for a definition
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLExpressionModelObject cqlExpressionModelObject = new CQLExpressionModelObject(ctx.identifier().getText(), tokens, def);
+        this.cqlExpressionModelObjects.add(cqlExpressionModelObject);
 
         return def;
     }
@@ -857,8 +908,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
         Pattern dateTimePattern =
                 Pattern.compile("T((\\d{2})(\\:(\\d{2})(\\:(\\d{2})(\\.(\\d+))?)?)?)?((Z)|(([+-])(\\d{2})(\\:?(\\d{2}))?))?");
-                               //-12-------3---4-------5---6-------7---8-------------91---11-----1-------1----1------------
-                               //-----------------------------------------------------0---12-----3-------4----5------------
+        //-12-------3---4-------5---6-------7---8-------------91---11-----1-------1----1------------
+        //-----------------------------------------------------0---12-----3-------4----5------------
 
         Matcher matcher = dateTimePattern.matcher(input);
         if (matcher.matches()) {
@@ -948,8 +999,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
         Pattern dateTimePattern =
                 Pattern.compile("(\\d{4})(-(\\d{2}))?(-(\\d{2}))?((Z)|(T((\\d{2})(\\:(\\d{2})(\\:(\\d{2})(\\.(\\d+))?)?)?)?((Z)|(([+-])(\\d{2})(\\:?(\\d{2}))?))?))?");
-                               //1-------2-3---------4-5---------67---8-91-------1---1-------1---1-------1---1-------------11---12-----2-------2----2---------------
-                               //----------------------------------------0-------1---2-------3---4-------5---6-------------78---90-----1-------2----3---------------
+        //1-------2-3---------4-5---------67---8-91-------1---1-------1---1-------1---1-------------11---12-----2-------2----2---------------
+        //----------------------------------------0-------1---2-------3---4-------5---6-------------78---90-----1-------2----3---------------
 
         Matcher matcher = dateTimePattern.matcher(input);
         if (matcher.matches()) {
@@ -1586,18 +1637,18 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
         Expression right = parseExpression(ctx.expression(1));
 
         // for union of lists
-            // collect list of types in either side
-            // cast both operands to a choice type with all types
+        // collect list of types in either side
+        // cast both operands to a choice type with all types
 
         // for intersect of lists
-            // collect list of types in both sides
-            // cast both operands to a choice type with all types
-            // TODO: cast the result to a choice type with only types in both sides
+        // collect list of types in both sides
+        // cast both operands to a choice type with all types
+        // TODO: cast the result to a choice type with only types in both sides
 
         // for difference of lists
-            // collect list of types in both sides
-            // cast both operands to a choice type with all types
-            // TODO: cast the result to the initial type of the left
+        // collect list of types in both sides
+        // cast both operands to a choice type with all types
+        // TODO: cast the result to the initial type of the left
 
         if (left.getResultType() instanceof ListType && right.getResultType() instanceof ListType) {
             ListType leftListType = (ListType)left.getResultType();
@@ -2385,8 +2436,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
                         // less than 3 days after -> (B, B + 3 days)
                         Interval interval =
                                 isBefore
-                                ? libraryBuilder.createInterval(lowerBound, isOffsetInclusive, upperBound, isInclusive)
-                                : libraryBuilder.createInterval(lowerBound, isInclusive, upperBound, isOffsetInclusive);
+                                        ? libraryBuilder.createInterval(lowerBound, isOffsetInclusive, upperBound, isInclusive)
+                                        : libraryBuilder.createInterval(lowerBound, isInclusive, upperBound, isOffsetInclusive);
 
                         track(interval, ctx.quantityOffset());
                         In in = of.createIn().withOperand(timingOperator.getLeft(), interval);
@@ -3070,8 +3121,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
      */
     private boolean isRHSEligibleForDateRangeOptimization(Expression rhs) {
         return
-            rhs.getResultType().isSubTypeOf(libraryBuilder.resolveTypeName("System", "DateTime"))
-                || rhs.getResultType().isSubTypeOf(new IntervalType(libraryBuilder.resolveTypeName("System", "DateTime")));
+                rhs.getResultType().isSubTypeOf(libraryBuilder.resolveTypeName("System", "DateTime"))
+                        || rhs.getResultType().isSubTypeOf(new IntervalType(libraryBuilder.resolveTypeName("System", "DateTime")));
 
         // BTR: The only requirement for the optimization is that the expression be of type DateTime or Interval<DateTime>
         // Whether or not the expression can be statically evaluated (literal, in the loose sense of the word) is really
@@ -3522,6 +3573,14 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
             }
         }
 
+        // for use in MAT code... holds all of the important information about a function.
+        List<String> tokens = new ArrayList<>();
+        for(int i = 0; i < ctx.getChildCount(); i++) {
+            tokens.add(ctx.getChild(i).getText());
+        }
+        CQLFunctionModelObject cqlFunctionModelObject = new CQLFunctionModelObject(ctx.identifier().getText(), tokens, fun);
+        this.cqlFunctionModelObjects.add(cqlFunctionModelObject);
+
         return fun;
     }
 
@@ -3612,18 +3671,18 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     private void decorate(Element element, TrackBack tb) {
         if (locate && tb != null) {
-                element.setLocator(tb.toLocator());
-            }
+            element.setLocator(tb.toLocator());
+        }
 
-            if (resultTypes && element.getResultType() != null) {
-                if (element.getResultType() instanceof NamedType) {
-                    element.setResultTypeName(libraryBuilder.dataTypeToQName(element.getResultType()));
-                }
-                else {
-                    element.setResultTypeSpecifier(libraryBuilder.dataTypeToTypeSpecifier(element.getResultType()));
-                }
+        if (resultTypes && element.getResultType() != null) {
+            if (element.getResultType() instanceof NamedType) {
+                element.setResultTypeName(libraryBuilder.dataTypeToQName(element.getResultType()));
+            }
+            else {
+                element.setResultTypeSpecifier(libraryBuilder.dataTypeToTypeSpecifier(element.getResultType()));
             }
         }
+    }
 
     private TrackBack track(Trackable trackable, ParseTree pt) {
         TrackBack tb = getTrackBack(pt);
@@ -3651,5 +3710,34 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
         }
 
         return tb;
+    }
+
+    // MAT code below... get information from the visitor
+    public List<CQLValueSetModelObject> getCqlValueSetModelObjects() {
+        return cqlValueSetModelObjects;
+    }
+
+    public List<CQLParameterModelObject> getCqlParameterModelObjects() {
+        return cqlParameterModelObjects;
+    }
+
+    public List<CQLCodeModelObject> getCqlCodeModelObjects() {
+        return cqlCodeModelObjects;
+    }
+
+    public List<CQLCodeSystemModelObject> getCqlCodeSystemModelObjects() {
+        return cqlCodeSystemModelObjects;
+    }
+
+    public List<CQLExpressionModelObject> getCqlExpressionModelObjects() {
+        return cqlExpressionModelObjects;
+    }
+
+    public List<CQLFunctionModelObject> getCqlFunctionModelObjects() {
+        return cqlFunctionModelObjects;
+    }
+
+    public List<CQLIncludeModelObject> getCqlIncludeModelObjects() {
+        return cqlIncludeModelObjects;
     }
 }

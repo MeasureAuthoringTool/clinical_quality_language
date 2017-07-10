@@ -40,7 +40,7 @@ public class CqlTranslator {
         DisableListTraversal,
         DisableDemotion,
         DisablePromotion,
-        DisableMethodInvocation
+        DisableMethodInvocation,
     }
     public static enum Format { XML, JSON, COFFEE }
     private Library library = null;
@@ -54,6 +54,9 @@ public class CqlTranslator {
     private ModelManager modelManager = null;
     private LibraryManager libraryManager = null;
     private CqlTranslatorException.ErrorSeverity errorLevel = CqlTranslatorException.ErrorSeverity.Info;
+
+    // for use in mat code... we want to capture the visitor information.
+    private Cql2ElmVisitor finalVisitor;
 
     public static CqlTranslator fromText(String cqlText, ModelManager modelManager, LibraryManager libraryManager, Options... options) {
         return new CqlTranslator(new ANTLRInputStream(cqlText), modelManager, libraryManager, CqlTranslatorException.ErrorSeverity.Info, options);
@@ -140,16 +143,24 @@ public class CqlTranslator {
 
     public List<CqlTranslatorException> getMessages() { return messages; }
 
+    /**
+     * Gets the visitor from the translator... this is used in MAT code...
+     * @return the visitor from the translator
+     */
+    public Cql2ElmVisitor getFinalVisitor() {
+        return finalVisitor;
+    }
+
     private class CqlErrorListener extends BaseErrorListener {
-        
+
         private LibraryBuilder builder;
         private boolean detailedErrors;
-      
+
         public CqlErrorListener(LibraryBuilder builder, boolean detailedErrors) {
             this.builder = builder;
             this.detailedErrors = detailedErrors;
         }
-      
+
         @Override
         public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line, int charPositionInLine, @NotNull String msg, @Nullable RecognitionException e) {
             TrackBack trackback = new TrackBack(new VersionedIdentifier().withId("unknown"), line, charPositionInLine, line, charPositionInLine);
@@ -157,15 +168,15 @@ public class CqlTranslator {
 
             if (detailedErrors) {
                 builder.recordParsingException(new CqlSyntaxException(msg, trackback, e));
-            builder.recordParsingException(new CqlTranslatorException(msg, trackback, e));
-        }
+                builder.recordParsingException(new CqlTranslatorException(msg, trackback, e));
+            }
             else {
                 if (offendingSymbol instanceof CommonToken) {
                     CommonToken token = (CommonToken) offendingSymbol;
                     builder.recordParsingException(new CqlSyntaxException(String.format("Syntax error at %s", token.getText()), trackback, e));
                 } else {
                     builder.recordParsingException(new CqlSyntaxException("Syntax error", trackback, e));
-    }
+                }
             }
         }
     }
@@ -184,6 +195,7 @@ public class CqlTranslator {
         builder.setErrorLevel(errorLevel);
         List<Options> optionList = Arrays.asList(options);
         Cql2ElmVisitor visitor = new Cql2ElmVisitor(builder);
+        finalVisitor = visitor;
         if (optionList.contains(Options.EnableDateRangeOptimization)) {
             visitor.enableDateRangeOptimization();
         }
@@ -434,6 +446,7 @@ public class CqlTranslator {
                 loadModelInfo(modelFile);
             }
 
+
             writeELM(in, out, outputFormat, options.has(optimization),
                     options.has(debug) || options.has(annotations),
                     options.has(debug) || options.has(locators),
@@ -441,8 +454,8 @@ public class CqlTranslator {
                     options.has(verify),
                     options.has(detailedErrors), // Didn't include in debug, maybe should...
                     options.has(errorLevel)
-                        ? (CqlTranslatorException.ErrorSeverity)options.valueOf(errorLevel)
-                        : CqlTranslatorException.ErrorSeverity.Info,
+                            ? (CqlTranslatorException.ErrorSeverity)options.valueOf(errorLevel)
+                            : CqlTranslatorException.ErrorSeverity.Info,
                     options.has(strict) || options.has(disableListTraversal),
                     options.has(strict) || options.has(disableDemotion),
                     options.has(strict) || options.has(disablePromotion),
