@@ -98,7 +98,7 @@ public class CQLtoELM {
     }
 
     /**
-     * The basic do translation method... so simple, so clean.
+     * The basic do translation method
      * @param validationOnly validation only flag, when this flag is set to true, no exports will be generated
      */
     public void doTranslation(boolean validationOnly) {
