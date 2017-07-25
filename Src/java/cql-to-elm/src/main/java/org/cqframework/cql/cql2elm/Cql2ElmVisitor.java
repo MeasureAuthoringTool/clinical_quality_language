@@ -408,9 +408,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
         // for use in MAT code. Holds all of the important information about the paramter
         List<String> tokens = new ArrayList<>();
-        for(int i = 0; i < ctx.getChildCount(); i++) {
-            tokens.add(ctx.getChild(i).getText());
-        }
+        tokenize(tokens, ctx);
+
         CQLParameterModelObject cqlParameterModelObject = new CQLParameterModelObject(ctx.identifier().getText(), tokens, param);
         this.cqlParameterModelObjects.add(cqlParameterModelObject);
 
@@ -693,6 +692,7 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     public ExpressionDef internalVisitExpressionDefinition(@NotNull cqlParser.ExpressionDefinitionContext ctx) {
         String identifier = parseString(ctx.identifier());
+
         ExpressionDef def = libraryBuilder.resolveExpressionRef(identifier);
         if (def == null) {
             libraryBuilder.pushExpressionContext(currentContext);
@@ -714,14 +714,6 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
             }
         }
 
-        // for use in MAT code... holds all of the important information for a definition
-        List<String> tokens = new ArrayList<>();
-        for(int i = 0; i < ctx.getChildCount(); i++) {
-            tokens.add(ctx.getChild(i).getText());
-        }
-        CQLExpressionModelObject cqlExpressionModelObject = new CQLExpressionModelObject(ctx.identifier().getText(), tokens, def);
-        this.cqlExpressionModelObjects.add(cqlExpressionModelObject);
-
         return def;
     }
 
@@ -733,10 +725,18 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
                 throw new IllegalArgumentException(String.format("Identifier %s is already in use in this library.", expressionDef.getName()));
             }
 
+            // for use in MAT code... holds all of the important information for a definition
+            List<String> tokens = new ArrayList<>();
+            tokenize(tokens, ctx);
+
+            CQLExpressionModelObject cqlExpressionModelObject = new CQLExpressionModelObject(ctx.identifier().getText(), tokens, expressionDef);
+            this.cqlExpressionModelObjects.add(cqlExpressionModelObject);
+
             // Track defined expression definitions locally, otherwise duplicate expression definitions will be missed because they are
             // overwritten by name when they are encountered by the preprocessor.
             definedExpressionDefinitions.add(expressionDef.getName());
         }
+
         return expressionDef;
     }
 
@@ -3573,14 +3573,6 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
             }
         }
 
-        // for use in MAT code... holds all of the important information about a function.
-        List<String> tokens = new ArrayList<>();
-        for(int i = 0; i < ctx.getChildCount(); i++) {
-            tokens.add(ctx.getChild(i).getText());
-        }
-        CQLFunctionModelObject cqlFunctionModelObject = new CQLFunctionModelObject(ctx.identifier().getText(), tokens, fun);
-        this.cqlFunctionModelObjects.add(cqlFunctionModelObject);
-
         return fun;
     }
 
@@ -3599,6 +3591,12 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
                 throw new IllegalArgumentException(String.format("A function named %s with the same type of arguments is already defined in this library.", operator.getName()));
             }
 
+            // for use in MAT code... holds all of the important information about a function.
+            List<String> tokens = new ArrayList<>();
+            tokenize(tokens, ctx);
+
+            CQLFunctionModelObject cqlFunctionModelObject = new CQLFunctionModelObject(ctx.identifier().getText(), tokens, result);
+            this.cqlFunctionModelObjects.add(cqlFunctionModelObject);
             definedSignatures.add(operator.getSignature());
         }
 
@@ -3713,6 +3711,25 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
     }
 
     // MAT code below... get information from the visitor
+
+    /**
+     * Splits the context into nice, individual tokens.
+     * @param tokens the list of tokens
+     * @param context the parse tree to parse through
+     */
+    private void tokenize(List<String> tokens, ParseTree context) {
+        if(context.getChildCount() == 0) {
+            tokens.add(context.getText());
+        }
+
+        else {
+            for(int i = 0; i < context.getChildCount(); i++) {
+                tokenize(tokens, context.getChild(i));
+            }
+        }
+    }
+
+
     public List<CQLValueSetModelObject> getCqlValueSetModelObjects() {
         return cqlValueSetModelObjects;
     }
