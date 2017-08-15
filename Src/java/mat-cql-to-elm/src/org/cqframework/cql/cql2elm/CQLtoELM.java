@@ -1,6 +1,7 @@
 package org.cqframework.cql.cql2elm;
 
 import org.cqframework.cql.cql2elm.cqlModels.LibraryHolder;
+import org.cqframework.cql.elm.tracking.TrackBack;
 import org.hl7.elm.r1.ExpressionDef;
 import org.hl7.elm.r1.Library;
 
@@ -73,8 +74,6 @@ public class CQLtoELM {
      */
     private List<CqlTranslatorException> errors = new ArrayList<>();
 
-
-
     /**
      * CQL to ELM constructor from strings.
      * @param parentCQLLibraryString the parent cql library string
@@ -109,6 +108,7 @@ public class CQLtoELM {
             // list promotion should be 'on'
             // list demotion should be 'off'
 
+            // annotations should be 'on'
             // locators should be 'on'
             // result types should be 'off'
             // detailed errors should be 'off'
@@ -376,22 +376,34 @@ public class CQLtoELM {
     }
 
     public static void main(String[] args) {
-        File file = new File("path/to/some/file");
+        File file = new File("C:\\Users\\jmeyer\\Development\\test_cql\\large_test\\test.cql");
         String cqlString = cqlFileToString(file);
         // you could also create a string like String cqlString = <cql library string here>
 
+        CQLtoELM cqLtoELM = new CQLtoELM(file);
+        cqLtoELM. doTranslation(false, true, true, false,
+                false, false, true, false,
+                true, CqlTranslatorException.ErrorSeverity.Error, false, "XML");
 
-        // if the string you are translating has included libraries, put them in the has map in the form of
-        // <libraryname-version, included library string>
-        HashMap<String, String> includedLibraries = new HashMap<>();
-        // includedLibraries.put(libraryname-version, includedCqlString)
+        List<ExpressionDef> expressions = cqLtoELM.getLibrary().getStatements().getDef();
+        for(ExpressionDef expression : expressions) {
+            System.out.println(expression.getTrackbacks());
+        }
 
-        CQLtoELM cqLtoELM = new CQLtoELM(cqlString, new HashMap<>());
-        cqLtoELM.doTranslation(false);
+        outputExceptions(cqLtoELM.getErrors());
 
-        // you could also parse from a file
-        // cqlLtoELM = new CQLtoELM(file).
+        System.out.println(cqLtoELM.getElmString());
     }
+
+    private static void outputExceptions(Iterable<CqlTranslatorException> exceptions) {
+        for (CqlTranslatorException error : exceptions) {
+            TrackBack tb = error.getLocator();
+            String lines = tb == null ? "[n/a]" : String.format("[%d:%d, %d:%d]",
+                    tb.getStartLine(), tb.getStartChar(), tb.getEndLine(), tb.getEndChar());
+            System.err.printf("%s:%s %s%n", error.getSeverity(), lines, error.getMessage());
+        }
+    }
+
 
     /**
      * Converts a cql file to a cql string
