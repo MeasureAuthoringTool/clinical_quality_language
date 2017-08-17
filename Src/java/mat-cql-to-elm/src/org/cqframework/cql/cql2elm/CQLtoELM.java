@@ -376,7 +376,7 @@ public class CQLtoELM {
     }
 
     public static void main(String[] args) {
-        File file = new File("C:\\Users\\jmeyer\\Development\\test_cql\\large_test\\test.cql");
+        File file = new File("path/to/file");
         String cqlString = cqlFileToString(file);
         // you could also create a string like String cqlString = <cql library string here>
 
@@ -384,11 +384,6 @@ public class CQLtoELM {
         cqLtoELM. doTranslation(false, true, true, false,
                 false, false, true, false,
                 true, CqlTranslatorException.ErrorSeverity.Error, false, "XML");
-
-        List<ExpressionDef> expressions = cqLtoELM.getLibrary().getStatements().getDef();
-        for(ExpressionDef expression : expressions) {
-            System.out.println(expression.getTrackbacks());
-        }
 
         outputExceptions(cqLtoELM.getErrors());
 
