@@ -4,21 +4,15 @@ import org.cqframework.cql.cql2elm.cqlModels.LibraryHolder;
 import org.cqframework.cql.elm.tracking.TrackBack;
 import org.hl7.elm.r1.ExpressionDef;
 import org.hl7.elm.r1.Library;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author Jack Meyer
  *
  * The Measure Authoring Tool CQL to ELM Wrapper.
- *
- * Last updated 7/6/2017, commit # 6ae6ac9fe1390131434a6a7c2cdd23f0dfd2cb34
  */
 public class CQLtoELM {
 
@@ -73,6 +67,8 @@ public class CQLtoELM {
      * The errors from cql-to-elm translation
      */
     private List<CqlTranslatorException> errors = new ArrayList<>();
+
+    Map<String, TrackBack> trackBackMap = new HashMap<>();
 
     /**
      * CQL to ELM constructor from strings.
@@ -226,6 +222,8 @@ public class CQLtoELM {
         this.warnings = translator.getWarnings();
         this.errors = translator.getErrors();
 
+       this.trackBackMap.putAll(translator.getFinalVisitor().getTrackBackMap());
+
         // create the library holder objects
         for(CqlTranslator cqlTranslator : libraryManager.getTranslators().values()) {
             Library currentLibrary = cqlTranslator.getTranslatedLibrary().getLibrary();
@@ -375,7 +373,65 @@ public class CQLtoELM {
         return expressionNames;
     }
 
-    public static void main(String[] args) {
+    /**
+     * Gets the expression to error map. This method will get the errors in a CQL Library and map them to their
+     * associated expressions. It will relocate the error lines to be relative to the expression. The map is in the form
+     * of <identifier, CQLExpressionError>
+     * @return the cql expression error mapping
+     */
+    public Map<String, List<CQLExpressionError>> getExpressionErrorMap() {
+
+        Map<String, List<CQLExpressionError>> expressionErrorMap = new HashMap<>();
+
+        List<CqlTranslatorException> errors = this.getErrors();
+
+        // if there are no errors, nothing can be done.
+        if(errors == null) {
+            return null;
+        }
+
+        Iterator iterator = this.trackBackMap.entrySet().iterator();
+        while(iterator.hasNext()) {
+            Map.Entry pair = (Map.Entry) iterator.next();
+            TrackBack currentTrackBack = (TrackBack) pair.getValue();
+            String currentIdentifier = (String) pair.getKey();
+
+            if(currentTrackBack != null) {
+                int expressionStartLine = currentTrackBack.getStartLine();
+                int expressionEndLine = currentTrackBack.getEndLine();
+
+                List<CQLExpressionError> expressionErrors = new ArrayList<>();
+                for(CqlTranslatorException error : errors) {
+
+                    int errorStartLine = error.getLocator().getStartLine();
+                    int errorEndLine = error.getLocator().getEndLine();
+
+                    if((errorStartLine >= expressionStartLine) && (errorEndLine <= expressionEndLine)) {
+                        int startLine = errorStartLine - expressionStartLine;
+                        int difference = errorEndLine - errorStartLine;
+                        int endLine = startLine + difference;
+                        int startChar = error.getLocator().getStartChar();
+                        int endChar = error.getLocator().getEndChar();
+                        CqlTranslatorException.ErrorSeverity severity = error.getSeverity();
+
+                        CQLExpressionError cqlExpressionError = new CQLExpressionError(error.getMessage(), startLine,
+                                endLine, startChar, endChar, severity);
+                        expressionErrors.add(cqlExpressionError);
+                    }
+
+                    expressionErrorMap.put(currentIdentifier, expressionErrors);
+                }
+            }
+        }
+
+        return expressionErrorMap;
+    }
+
+    public Map<String, TrackBack> getTrackBackMap() {
+        return trackBackMap;
+    }
+
+    public static void main(String[] args) throws Exception {
         File file = new File("path/to/file");
         String cqlString = cqlFileToString(file);
         // you could also create a string like String cqlString = <cql library string here>
@@ -385,9 +441,24 @@ public class CQLtoELM {
                 false, false, true, false,
                 true, CqlTranslatorException.ErrorSeverity.Error, false, "XML");
 
-        outputExceptions(cqLtoELM.getErrors());
+        outputErrorMap(cqLtoELM.getExpressionErrorMap());
 
-        System.out.println(cqLtoELM.getElmString());
+        outputExceptions(cqLtoELM.getErrors());
+    }
+
+    /**
+     * Prints the output error map to the console
+     * @param errors the errors to print
+     */
+    private static void outputErrorMap(Map<String, List<CQLExpressionError>> errors) {
+        Iterator it = errors.entrySet().iterator();
+        while(it.hasNext()) {
+            Map.Entry pair = (Map.Entry) it.next();
+            System.out.println(pair.getKey());
+            for(CQLExpressionError expressionError : (List<CQLExpressionError>) pair.getValue()) {
+                System.out.println("\t" + expressionError);
+            }
+        }
     }
 
     private static void outputExceptions(Iterable<CqlTranslatorException> exceptions) {

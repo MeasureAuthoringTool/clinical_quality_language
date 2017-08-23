@@ -48,6 +48,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     private final SystemMethodResolver systemMethodResolver;
 
+    Map<String, TrackBack> trackBackMap = new HashMap<>();
+
     private LibraryInfo libraryInfo = null;
     public void setLibraryInfo(LibraryInfo libraryInfo) {
         if (libraryInfo == null) {
@@ -375,6 +377,9 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     @Override
     public ParameterDef visitParameterDefinition(@NotNull cqlParser.ParameterDefinitionContext ctx) {
+
+        this.trackBackMap.put(parseString(ctx.identifier()), getTrackBack(ctx));
+
         ParameterDef param = of.createParameterDef()
                 .withAccessLevel(parseAccessModifier(ctx.accessModifier()))
                 .withName(parseString(ctx.identifier()))
@@ -692,6 +697,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     public ExpressionDef internalVisitExpressionDefinition(@NotNull cqlParser.ExpressionDefinitionContext ctx) {
         String identifier = parseString(ctx.identifier());
+
+        this.trackBackMap.put(identifier, getTrackBack(ctx));
 
         ExpressionDef def = libraryBuilder.resolveExpressionRef(identifier);
         if (def == null) {
@@ -3521,6 +3528,8 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
     }
 
     public Object internalVisitFunctionDefinition(@NotNull cqlParser.FunctionDefinitionContext ctx) {
+        this.trackBackMap.put(parseString(ctx.identifier()), getTrackBack(ctx));
+
         FunctionDef fun = of.createFunctionDef()
                 .withAccessLevel(parseAccessModifier(ctx.accessModifier()))
                 .withName(parseString(ctx.identifier()));
@@ -3766,5 +3775,9 @@ public class Cql2ElmVisitor extends cqlBaseVisitor {
 
     public List<CQLIncludeModelObject> getCqlIncludeModelObjects() {
         return cqlIncludeModelObjects;
+    }
+
+    public Map<String, TrackBack> getTrackBackMap() {
+        return trackBackMap;
     }
 }

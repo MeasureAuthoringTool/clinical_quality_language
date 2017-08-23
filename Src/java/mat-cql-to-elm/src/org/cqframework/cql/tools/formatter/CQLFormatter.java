@@ -76,8 +76,8 @@ public class CQLFormatter {
     }
 
     public static void main(String[] args) throws IOException {
-        File file = new File("C:\\Users\\jmeyer\\Development\\test_cql\\large_test\\test.cql");
-        String toFormat = cqlFileToString(file);
+        File file = new File("path/to/file");
+//        String toFormat = cqlFileToString(file);
         CQLFormatter.format(file);
     }
 }
