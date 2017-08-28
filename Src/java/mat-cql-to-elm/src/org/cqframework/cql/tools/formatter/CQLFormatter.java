@@ -56,7 +56,16 @@ public class CQLFormatter {
      * @throws IOException
      */
     private static String format(InputStream is) throws IOException {
-        return CqlFormatterVisitor.getFormattedOutput(is);
+
+        CqlFormatterVisitor.FormatResult result = CqlFormatterVisitor.getFormattedOutput(is);
+
+        if(result != null) {
+            return result.output;
+        }
+
+        else {
+            return "";
+        }
     }
 
     /**
