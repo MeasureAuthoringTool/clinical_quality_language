@@ -101,7 +101,6 @@ public class CQLtoELM {
         // MAT-8665
             // list path traversal should be 'on'
             // method style invocation should be 'off'
-            // list promotion should be 'on'
             // list demotion should be 'off'
 
             // annotations should be 'on'
@@ -109,11 +108,14 @@ public class CQLtoELM {
             // result types should be 'off'
             // detailed errors should be 'off'
 
+        // MAT-8805
+            // list promotion should be turned 'off'
+
         // MAT-8702
             // messages should not come out in the ELM, therefore we will have our error level as 'Error'
 
         doTranslation(false, true, true, false,
-                false, false, true, false,
+                false, false, true, true,
                  true, CqlTranslatorException.ErrorSeverity.Error, validationOnly, "XML");
     }
 
@@ -158,6 +160,10 @@ public class CQLtoELM {
 
         if(enableDetailedErrors) {
             options.add(CqlTranslator.Options.EnableDetailedErrors);
+        }
+
+        if(disableListTraversal) {
+            options.add(CqlTranslator.Options.DisableListTraversal);
         }
 
         if(disableDemotion) {
