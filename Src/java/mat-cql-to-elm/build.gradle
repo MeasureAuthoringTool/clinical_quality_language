@@ -1,0 +1,8 @@
+apply plugin: 'application'
+
+mainClassName = 'org.cqframework.cql.cql2elm.CQLtoELM'
+
+dependencies {
+    compile project(':cql-to-elm')
+    compile project(':tools:cql-formatter')
+} 
