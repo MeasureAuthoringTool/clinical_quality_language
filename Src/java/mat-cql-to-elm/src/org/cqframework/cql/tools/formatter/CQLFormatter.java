@@ -60,7 +60,7 @@ public class CQLFormatter {
         CqlFormatterVisitor.FormatResult result = CqlFormatterVisitor.getFormattedOutput(is);
 
         if(result != null) {
-            return result.output;
+            return result.getOutput();
         }
 
         else {

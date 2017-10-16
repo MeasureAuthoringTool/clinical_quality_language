@@ -2,6 +2,7 @@ package org.cqframework.cql.cql2elm;
 
 import org.cqframework.cql.cql2elm.cqlModels.LibraryHolder;
 import org.cqframework.cql.elm.tracking.TrackBack;
+import org.cqframework.cql.tools.formatter.CQLFormatter;
 import org.hl7.elm.r1.ExpressionDef;
 import org.hl7.elm.r1.Library;
 import java.io.File;
@@ -41,6 +42,16 @@ public class CQLtoELM {
      * This list of elm strings from cql-to-elm translation
      */
     private List<String> elmStrings = new ArrayList<>();
+
+    /**
+     * The parent json elm string
+     */
+    private String parentJsonString;
+
+    /**
+     * The list of json elm strings from the cql-to-elm translation
+     */
+    private List<String> jsonStrings = new ArrayList<>();
 
     /**
      * The cql library holder mapping. It should follow the format. <String, String>, where the key is in the format
@@ -114,9 +125,27 @@ public class CQLtoELM {
         // MAT-8702
             // messages should not come out in the ELM, therefore we will have our error level as 'Error'
 
+        // by default MAT will produce both
+        List<String> formats = new ArrayList<>();
+        formats.add("XML");
+        formats.add("JSON");
         doTranslation(false, true, true, false,
                 false, false, true, true,
-                 true, CqlTranslatorException.ErrorSeverity.Error, validationOnly, "XML");
+                 true, CqlTranslatorException.ErrorSeverity.Error, validationOnly, formats);
+    }
+
+    /**
+     * The do translation method that
+     * @param validationOnly
+     * @param format the format string "XML" or "JSON"
+     */
+    public void doTranslation(boolean validationOnly, String format) {
+
+        List<String> formats = new ArrayList<>();
+        formats.add(format);
+        doTranslation(false, true, true, false,
+                false, false, true, true,
+                true, CqlTranslatorException.ErrorSeverity.Error, validationOnly, formats);
     }
 
     /**
@@ -133,12 +162,12 @@ public class CQLtoELM {
      * @param disableMethodInvocation flag for disabling method invocation, when true, method invocation will not happen
      * @param errorSeverity flag for the error severity level
      * @param validationOnly flag for running in validation only mode, when true, no exports will be generated
-     * @param format format string
+     * @param formats a list of strings to format
      */
     public void doTranslation(boolean enableDateRangeOptimization, boolean enableAnnotations, boolean enableLocators,
                               boolean enableResultTypes, boolean enableDetailedErrors, boolean disableListTraversal,
                               boolean disableDemotion, boolean disablePromotion, boolean disableMethodInvocation,
-                              CqlTranslatorException.ErrorSeverity errorSeverity, boolean validationOnly, String format) {
+                              CqlTranslatorException.ErrorSeverity errorSeverity, boolean validationOnly, List<String> formats) {
 
         // add in all of the flags
         List<CqlTranslator.Options> options = new ArrayList<>();
@@ -184,14 +213,14 @@ public class CQLtoELM {
         if(parentCQLLibraryString != null && parentCQLLibraryFile == null) {
             libraryManager.getLibrarySourceLoader().registerProvider(
                     new StringLibrarySourceProvider(this.cqlLibraryMapping));
-            writeToELM(options.toArray(new CqlTranslator.Options[options.size()]), errorSeverity, format, modelManager, libraryManager);
+            writeToELM(options.toArray(new CqlTranslator.Options[options.size()]), errorSeverity, formats, modelManager, libraryManager);
         }
 
         // parse from file
         else {
             libraryManager.getLibrarySourceLoader().registerProvider(
                     new DefaultLibrarySourceProvider(this.parentCQLLibraryFile.getParentFile().toPath()));
-            writeToELM(options.toArray(new CqlTranslator.Options[options.size()]), errorSeverity, format, modelManager, libraryManager);
+            writeToELM(options.toArray(new CqlTranslator.Options[options.size()]), errorSeverity, formats, modelManager, libraryManager);
         }
 
     }
@@ -200,7 +229,7 @@ public class CQLtoELM {
      * Converts the cql to elm, if validation only is false, it will create elm strings.
      * @param options the parser options
      */
-    private void writeToELM(CqlTranslator.Options[] options, CqlTranslatorException.ErrorSeverity errorSeverity, String format, ModelManager modelManager,
+    private void writeToELM(CqlTranslator.Options[] options, CqlTranslatorException.ErrorSeverity errorSeverity, List<String> formats, ModelManager modelManager,
                             LibraryManager libraryManager) {
 
         CqlTranslator translator = null;
@@ -244,26 +273,27 @@ public class CQLtoELM {
         }
 
         // output the elm strings
-        if(format.equalsIgnoreCase("XML")) {
+        if(formats.contains("XML")) {
             this.parentElmString = translator.toXml();
             for(CqlTranslator currentTranslator : libraryManager.getTranslators().values()) {
                 this.elmStrings.add(currentTranslator.toXml());
             }
         }
 
-        if(format.equalsIgnoreCase("JSON")) {
-            this.parentElmString = translator.toJson();
+        // output the json strings
+        if(formats.contains("JSON")) {
+            this.parentJsonString = translator.toJson();
             for(CqlTranslator currentTranslator : libraryManager.getTranslators().values()) {
-                this.elmStrings.add(currentTranslator.toJson());
+                this.jsonStrings.add(currentTranslator.toJson());
             }
         }
 
-        if(format.equalsIgnoreCase("COFFEE")) {
-            this.parentElmString = "module.exports = " + translator.toJson();
-            for(CqlTranslator currentTranslator : libraryManager.getTranslators().values()) {
-                this.elmStrings.add("module.exports = " + currentTranslator.toJson());
-            }
-        }
+//        if(format.equalsIgnoreCase("COFFEE")) {
+//            this.parentElmString = "module.exports = " + translator.toJson();
+//            for(CqlTranslator currentTranslator : libraryManager.getTranslators().values()) {
+//                this.elmStrings.add("module.exports = " + currentTranslator.toJson());
+//            }
+//        }
     }
 
     /**
@@ -328,6 +358,22 @@ public class CQLtoELM {
      */
     public List<String> getElmStrings() {
         return elmStrings;
+    }
+
+    /**
+     * Gets the parent json elm string from cql-to-elm translation
+     * @return the parent json elm string
+     */
+    public String getParentJsonString() {
+        return parentJsonString;
+    }
+
+    /**
+     * Gets the list of json elm strings from the cql-to-elm translation
+     * @return the list of json elm strings
+     */
+    public List<String> getJsonStrings() {
+        return jsonStrings;
     }
 
     /**
@@ -441,15 +487,11 @@ public class CQLtoELM {
         File file = new File("path/to/file");
         String cqlString = cqlFileToString(file);
         // you could also create a string like String cqlString = <cql library string here>
-
         CQLtoELM cqLtoELM = new CQLtoELM(file);
-        cqLtoELM. doTranslation(false, true, true, false,
-                false, false, true, false,
-                true, CqlTranslatorException.ErrorSeverity.Error, false, "XML");
+        cqLtoELM.doTranslation(true, "XML");
+        CQLFormatter.format(file);
 
         outputErrorMap(cqLtoELM.getExpressionErrorMap());
-
-        outputExceptions(cqLtoELM.getErrors());
     }
 
     /**
